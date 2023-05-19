@@ -24,6 +24,13 @@ pub struct Items<T> {
 pub struct ApiError {
     pub code: Option<String>,
     pub message: String,
+    pub errors: Option<Vec<InnerApiError>>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct InnerApiError {
+    pub code: Option<String>,
+    pub message: String,
 }
 
 impl Display for ApiError {

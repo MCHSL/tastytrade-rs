@@ -1,3 +1,4 @@
+use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 
 use crate::api::base::Result;
@@ -51,7 +52,7 @@ pub struct Account<'t> {
 
 impl<'t> Account<'t> {
     pub async fn balance(&self) -> Result<Balance> {
-        let resp: Balance = self
+        let resp = self
             .tasty
             .get(&format!(
                 "/accounts/{}/balances",
@@ -87,7 +88,10 @@ impl<'t> Account<'t> {
         let resp: DryRunResult = self
             .tasty
             .post(
-                &format!("/accounts/{}/orders", self.inner.account.account_number.0),
+                &format!(
+                    "/accounts/{}/orders/dry-run",
+                    self.inner.account.account_number.0
+                ),
                 order,
             )
             .await?;
@@ -99,9 +103,14 @@ impl<'t> Account<'t> {
 #[serde(rename_all = "kebab-case")]
 pub struct Balance {
     pub account_number: AccountNumber,
-    pub cash_balance: String,
-    pub long_equity_value: String,
-    pub short_equity_value: String,
-    pub long_derivative_value: String,
-    pub short_derivative_value: String,
+    #[serde(with = "rust_decimal::serde::arbitrary_precision")]
+    pub cash_balance: Decimal,
+    #[serde(with = "rust_decimal::serde::arbitrary_precision")]
+    pub long_equity_value: Decimal,
+    #[serde(with = "rust_decimal::serde::arbitrary_precision")]
+    pub short_equity_value: Decimal,
+    #[serde(with = "rust_decimal::serde::arbitrary_precision")]
+    pub long_derivative_value: Decimal,
+    #[serde(with = "rust_decimal::serde::arbitrary_precision")]
+    pub short_derivative_value: Decimal,
 }

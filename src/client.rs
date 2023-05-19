@@ -7,8 +7,11 @@ use serde::Serialize;
 
 use crate::api::base::Result;
 use crate::api::base::TastyApiResponse;
+use crate::api::base::TastyError;
 use crate::api::login::LoginCredentials;
 use crate::api::login::LoginResponse;
+
+use reqwest_inspect_json::InspectJson;
 
 pub const BASE_URL: &str = "https://api.cert.tastyworks.com";
 
@@ -84,7 +87,10 @@ impl TastyTrade {
             .body(serde_json::to_string(&payload).unwrap())
             .send()
             .await?
-            .json::<TastyApiResponse<R>>()
+            .inspect_json::<TastyApiResponse<R>, TastyError>(move |text| {
+                println!("{text}");
+            })
+            //.json::<TastyApiResponse<R>>()
             .await?;
 
         match result {
