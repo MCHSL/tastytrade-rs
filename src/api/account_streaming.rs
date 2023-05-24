@@ -2,11 +2,10 @@ use std::time::Duration;
 
 use futures_util::{SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio_tungstenite::{connect_async, tungstenite::Message};
 
 use crate::{
-    accounts::{Account, AccountNumber, Balance},
+    accounts::{Account, Balance},
     Result, TastyTrade,
 };
 
@@ -47,21 +46,30 @@ pub enum Notification {
 #[derive(Deserialize, Debug)]
 #[serde(rename_all = "kebab-case")]
 pub struct StatusMessage {
-    status: String,
-    action: String,
-    web_socket_session_id: String,
-    request_id: u64,
+    pub status: String,
+    pub action: String,
+    pub web_socket_session_id: String,
+    pub request_id: u64,
+}
+
+#[derive(Deserialize, Debug)]
+#[serde(rename_all = "kebab-case")]
+pub struct ErrorMessage {
+    pub status: String,
+    pub action: String,
+    pub web_socket_session_id: String,
+    pub message: String,
 }
 
 #[derive(Deserialize, Debug)]
 #[serde(untagged)]
 pub enum SubMessage {
+    ErrorMessage(ErrorMessage),
     StatusMessage(StatusMessage),
     Notification(Notification),
 }
 
 pub struct AccountWebsocketHandler {
-    token: String,
     pub event_receiver: flume::Receiver<SubMessage>,
     pub action_sender: flume::Sender<HandlerAction>,
 }
@@ -85,6 +93,7 @@ impl AccountWebsocketHandler {
         tokio::spawn(async move {
             while let Some(message) = read.next().await {
                 let data = message.unwrap().into_data();
+                println!("{:?}", String::from_utf8_lossy(&data));
                 let data: SubMessage = serde_json::from_slice(&data).unwrap();
                 event_sender.send_async(data).await.unwrap();
             }
@@ -123,7 +132,6 @@ impl AccountWebsocketHandler {
         });
 
         Ok(Self {
-            token,
             event_receiver,
             action_sender,
         })

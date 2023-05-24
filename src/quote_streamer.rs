@@ -1,12 +1,9 @@
-use std::io::Write;
-use std::pin::Pin;
 use std::{ffi::CString, fmt::Display};
 
 use dxfeed::Event;
 use widestring::WideCString;
 
 use crate::api::order::AsSymbol;
-use crate::api::order::Symbol;
 use crate::Result;
 use crate::TastyTrade;
 
@@ -149,9 +146,9 @@ impl QuoteStreamer {
 }
 
 impl TastyTrade {
-    pub async fn create_quote_streamer(&self) -> Result<Pin<Box<QuoteStreamer>>> {
+    pub async fn create_quote_streamer(&self) -> Result<QuoteStreamer> {
         let tokens = self.quote_streamer_tokens().await?;
         let streamer = QuoteStreamer::connect(tokens.streamer_url, tokens.token)?;
-        Ok(Box::pin(streamer))
+        Ok(streamer)
     }
 }

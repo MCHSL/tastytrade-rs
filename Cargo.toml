@@ -16,7 +16,6 @@ rust_decimal_macros = "1.29.1"
 serde = { version = "1.0.163", features = ["derive"] }
 serde_json = "1.0.96"
 thiserror = "1.0.40"
-dxfeed = { git = "https://github.com/MCHSL/dxfeed-rust-api", branch = "windows-fix-2"}
 flume = "0.10.14"
 widestring = "1.0.2"
 url = "2.3.1"
@@ -24,3 +23,4 @@ tokio-tungstenite = { version = "0.19.0", features = ["native-tls"] }
 tokio = { version = "1.28.1", features = ["io-util"] }
 futures-util = "0.3.28"
 erased-serde = "0.3.25"
+dxfeed = "0.2.1"
