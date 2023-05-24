@@ -18,6 +18,7 @@ pub const BASE_URL: &str = "https://api.cert.tastyworks.com";
 #[derive(Debug, Clone)]
 pub struct TastyTrade {
     client: reqwest::Client,
+    pub(crate) session_token: String,
 }
 
 impl TastyTrade {
@@ -32,7 +33,9 @@ impl TastyTrade {
             })
             .send()
             .await?;
-        let json = resp.json::<TastyApiResponse<LoginResponse>>().await?;
+        let json = resp
+            .inspect_json::<TastyApiResponse<LoginResponse>, TastyError>(|text| println!("{text}"))
+            .await?;
         let response = match json {
             TastyApiResponse::Success(s) => Ok(s),
             TastyApiResponse::Error { error } => Err(error),
@@ -49,12 +52,19 @@ impl TastyTrade {
             header::CONTENT_TYPE,
             HeaderValue::from_str("application/json").unwrap(),
         );
+        headers.insert(
+            header::USER_AGENT,
+            HeaderValue::from_str("tastytrade-rs").unwrap(),
+        );
         let client = ClientBuilder::new()
             .default_headers(headers)
             .build()
             .expect("Could not create client");
 
-        Ok(Self { client })
+        Ok(Self {
+            client,
+            session_token: response.session_token,
+        })
     }
 
     pub async fn get<T: DeserializeOwned, U: AsRef<str>>(&self, url: U) -> Result<T> {
@@ -65,7 +75,10 @@ impl TastyTrade {
             .get(url)
             .send()
             .await?
-            .json::<TastyApiResponse<T>>()
+            .inspect_json::<TastyApiResponse<T>, TastyError>(move |text| {
+                println!("{text}");
+            })
+            //.json::<TastyApiResponse<T>>()
             .await?;
 
         match result {

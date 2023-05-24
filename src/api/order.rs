@@ -1,5 +1,5 @@
 use derive_builder::Builder;
-use rust_decimal::{serde::DecimalFromString, Decimal};
+use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 
 use crate::accounts::AccountNumber;
@@ -62,12 +62,49 @@ pub enum TimeInForce {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+pub enum OrderStatus {
+    Received,
+    Routed,
+    #[serde(rename = "In Flight")]
+    InFlight,
+    Live,
+    #[serde(rename = "Cancel Requested")]
+    CancelRequested,
+    #[serde(rename = "Replace Requested")]
+    ReplaceRequested,
+    Contingent,
+    Filled,
+    Cancelled,
+    Expired,
+    Rejected,
+    Removed,
+    #[serde(rename = "Partially Removed")]
+    PartiallyRemoved,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(transparent)]
 pub struct Symbol(pub String);
 
 impl<T: AsRef<str>> From<T> for Symbol {
     fn from(value: T) -> Self {
         Self(value.as_ref().to_owned())
+    }
+}
+
+pub trait AsSymbol {
+    fn as_symbol(&self) -> Symbol;
+}
+
+impl<T: AsRef<str>> AsSymbol for T {
+    fn as_symbol(&self) -> Symbol {
+        Symbol(self.as_ref().to_owned())
+    }
+}
+
+impl AsSymbol for Symbol {
+    fn as_symbol(&self) -> Symbol {
+        self.clone()
     }
 }
 
@@ -87,7 +124,7 @@ pub struct LiveOrderRecord {
     #[serde(with = "rust_decimal::serde::arbitrary_precision")]
     pub price: Decimal,
     pub price_effect: PriceEffect,
-    pub status: String,
+    pub status: OrderStatus,
     pub cancellable: bool,
     pub editable: bool,
     pub edited: bool,
@@ -123,8 +160,18 @@ pub struct Order {
 pub struct OrderLeg {
     instrument_type: InstrumentType,
     symbol: Symbol,
-    quantity: u64,
+    #[serde(with = "rust_decimal::serde::float")]
+    quantity: Decimal,
     action: Action,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub struct OrderPlacedResult {
+    pub order: LiveOrderRecord,
+    pub warnings: Vec<Warning>,
+    pub buying_power_effect: BuyingPowerEffect,
+    pub fee_calculation: FeeCalculation,
 }
 
 #[derive(Debug, Deserialize)]
@@ -147,7 +194,7 @@ pub struct DryRunRecord {
     #[serde(with = "rust_decimal::serde::arbitrary_precision")]
     pub price: Decimal,
     pub price_effect: PriceEffect,
-    pub status: String,
+    pub status: OrderStatus,
     pub cancellable: bool,
     pub editable: bool,
     pub edited: bool,
@@ -158,25 +205,25 @@ pub struct DryRunRecord {
 #[serde(rename_all = "kebab-case")]
 pub struct BuyingPowerEffect {
     #[serde(with = "rust_decimal::serde::arbitrary_precision")]
-    change_in_margin_requirement: Decimal,
-    change_in_margin_requirement_effect: PriceEffect,
+    pub change_in_margin_requirement: Decimal,
+    pub change_in_margin_requirement_effect: PriceEffect,
     #[serde(with = "rust_decimal::serde::arbitrary_precision")]
-    change_in_buying_power: Decimal,
-    change_in_buying_power_effect: PriceEffect,
+    pub change_in_buying_power: Decimal,
+    pub change_in_buying_power_effect: PriceEffect,
     #[serde(with = "rust_decimal::serde::arbitrary_precision")]
-    current_buying_power: Decimal,
-    current_buying_power_effect: PriceEffect,
+    pub current_buying_power: Decimal,
+    pub current_buying_power_effect: PriceEffect,
     #[serde(with = "rust_decimal::serde::arbitrary_precision")]
-    impact: Decimal,
-    effect: PriceEffect,
+    pub impact: Decimal,
+    pub effect: PriceEffect,
 }
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct FeeCalculation {
     #[serde(with = "rust_decimal::serde::arbitrary_precision")]
-    total_fees: Decimal,
-    total_fees_effect: PriceEffect,
+    pub total_fees: Decimal,
+    pub total_fees_effect: PriceEffect,
 }
 
 #[derive(Debug, Deserialize)]

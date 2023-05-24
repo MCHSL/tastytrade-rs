@@ -1,0 +1,13 @@
+[package]
+name = "quote-streaming"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+rust_decimal = "1.29.1"
+rust_decimal_macros = "1.29.1"
+tastytrade-rs = { path = "../../../tastytrade-rs" }
+tokio = { version = "1.28.1", features = ["full"] }
+url = "2.3.1"
