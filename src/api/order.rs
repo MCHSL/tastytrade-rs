@@ -82,7 +82,7 @@ pub enum OrderStatus {
     PartiallyRemoved,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[serde(transparent)]
 pub struct Symbol(pub String);
 
@@ -105,6 +105,12 @@ impl<T: AsRef<str>> AsSymbol for T {
 impl AsSymbol for Symbol {
     fn as_symbol(&self) -> Symbol {
         self.clone()
+    }
+}
+
+impl AsSymbol for &Symbol {
+    fn as_symbol(&self) -> Symbol {
+        (*self).clone()
     }
 }
 

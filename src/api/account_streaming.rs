@@ -10,8 +10,10 @@ use crate::{
 };
 
 use super::order::LiveOrderRecord;
+use super::position::Position;
 
-static WEBSOCKET_URL: &str = "wss://streamer.cert.tastyworks.com";
+static WEBSOCKET_DEMO_URL: &str = "wss://streamer.cert.tastyworks.com";
+static WEBSOCKET_URL: &str = "wss://streamer.tastyworks.com";
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "kebab-case")]
@@ -38,9 +40,12 @@ pub struct HandlerAction {
 
 #[derive(Deserialize, Debug)]
 #[serde(tag = "type", content = "data")]
-pub enum Notification {
+pub enum AccountMessage {
     Order(LiveOrderRecord),
     AccountBalance(Balance),
+    CurrentPosition(Box<Position>),
+    OrderChain,
+    ExternalTransaction,
 }
 
 #[derive(Deserialize, Debug)]
@@ -61,32 +66,47 @@ pub struct ErrorMessage {
     pub message: String,
 }
 
+//#[allow(clippy::large_enum_variant)]
 #[derive(Deserialize, Debug)]
 #[serde(untagged)]
-pub enum SubMessage {
+pub enum AccountEvent {
     ErrorMessage(ErrorMessage),
     StatusMessage(StatusMessage),
-    Notification(Notification),
+    AccountMessage(Box<AccountMessage>),
 }
 
-pub struct AccountWebsocketHandler {
-    pub event_receiver: flume::Receiver<SubMessage>,
+#[derive(Debug)]
+pub struct AccountStreamer {
+    pub event_receiver: flume::Receiver<AccountEvent>,
     pub action_sender: flume::Sender<HandlerAction>,
 }
 
-impl AccountWebsocketHandler {
-    pub async fn connect<T: AsRef<str>>(token: T) -> Result<Self> {
-        let token = token.as_ref().to_owned();
+impl AccountStreamer {
+    pub async fn connect(tasty: &TastyTrade) -> Result<AccountStreamer> {
+        let token = &tasty.session_token;
         let (event_sender, event_receiver) = flume::unbounded();
         let (action_sender, action_receiver): (
             flume::Sender<HandlerAction>,
             flume::Receiver<HandlerAction>,
         ) = flume::unbounded();
 
-        let url = url::Url::parse(WEBSOCKET_URL).unwrap();
+        let url = if tasty.demo {
+            url::Url::parse(WEBSOCKET_DEMO_URL).unwrap()
+        } else {
+            url::Url::parse(WEBSOCKET_URL).unwrap()
+        };
 
         let (ws_stream, _response) = connect_async(url).await?;
-        println!("WebSocket handshake has been successfully completed");
+        // let hello = ws_stream.try_next().await?;
+        // if let Some(msg) = hello {
+        //     match serde_json::from_slice(&msg.into_data())? {
+        //         SubMessage::ErrorMessage(_) => return Err(ConnectionClosed.into()), // Perhaps retry on our own?
+        //         SubMessage::StatusMessage(_) => {}
+        //         _ => unreachable!(),
+        //     }
+        // } else {
+        //     return Err(ConnectionClosed.into());
+        // }
 
         let (mut write, mut read) = ws_stream.split();
 
@@ -94,7 +114,7 @@ impl AccountWebsocketHandler {
             while let Some(message) = read.next().await {
                 let data = message.unwrap().into_data();
                 println!("{:?}", String::from_utf8_lossy(&data));
-                let data: SubMessage = serde_json::from_slice(&data).unwrap();
+                let data: AccountEvent = serde_json::from_slice(&data).unwrap();
                 event_sender.send_async(data).await.unwrap();
             }
         });
@@ -109,7 +129,7 @@ impl AccountWebsocketHandler {
                 };
                 let message = serde_json::to_string(&message).unwrap();
 
-                println!("{message:?}");
+                //println!("{message:?}");
 
                 let message = Message::Text(message);
 
@@ -160,18 +180,24 @@ impl AccountWebsocketHandler {
             .unwrap();
     }
 
-    pub async fn handle_events<F>(&mut self, f: F)
-    where
-        F: Fn(SubMessage),
-    {
-        while let Ok(ev) = self.event_receiver.recv_async().await {
-            f(ev);
-        }
+    pub async fn close(&self) {}
+
+    // pub async fn handle_events<F>(&mut self, f: F)
+    // where
+    //     F: Fn(AccountEvent),
+    // {
+    //     while let Ok(ev) = self.event_receiver.recv_async().await {
+    //         f(ev);
+    //     }
+    // }
+
+    pub async fn get_event(&self) -> std::result::Result<AccountEvent, flume::RecvError> {
+        self.event_receiver.recv_async().await
     }
 }
 
 impl TastyTrade {
-    pub async fn create_account_streamer(&self) -> Result<AccountWebsocketHandler> {
-        AccountWebsocketHandler::connect(&self.session_token).await
+    pub async fn create_account_streamer(&self) -> Result<AccountStreamer> {
+        AccountStreamer::connect(self).await
     }
 }

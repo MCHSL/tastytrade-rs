@@ -5,7 +5,7 @@ use crate::api::base::Result;
 use crate::client::TastyTrade;
 
 use super::base::Items;
-use super::order::{DryRunResult, LiveOrderRecord, Order, OrderPlacedResult};
+use super::order::{DryRunResult, LiveOrderRecord, Order, OrderId, OrderPlacedResult};
 use super::position::Position;
 
 impl TastyTrade {
@@ -73,6 +73,10 @@ pub struct Account<'t> {
 }
 
 impl<'t> Account<'t> {
+    pub fn number(&self) -> AccountNumber {
+        self.inner.account.account_number.clone()
+    }
+
     pub async fn balance(&self) -> Result<Balance> {
         let resp = self
             .tasty
@@ -129,6 +133,15 @@ impl<'t> Account<'t> {
             )
             .await?;
         Ok(resp)
+    }
+
+    pub async fn cancel_order(&self, id: OrderId) -> Result<LiveOrderRecord> {
+        self.tasty
+            .delete(&format!(
+                "/accounts/{}/orders/{}",
+                self.inner.account.account_number.0, id.0
+            ))
+            .await
     }
 }
 

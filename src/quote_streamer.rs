@@ -1,3 +1,4 @@
+use std::sync::Mutex;
 use std::{ffi::CString, fmt::Display};
 
 use dxfeed::Event;
@@ -20,29 +21,32 @@ impl Display for DxFeedError {
     }
 }
 
+#[derive(Debug)]
 pub struct QuoteStreamer {
     host: String,
     token: String,
 
-    connection: dxfeed::dxf_connection_t,
-    subscription: dxfeed::dxf_subscription_t,
+    connection: Mutex<dxfeed::dxf_connection_t>,
+    subscription: Mutex<dxfeed::dxf_subscription_t>,
 
-    event_receiver: flume::Receiver<dxfeed::Event>,
+    pub event_receiver: flume::Receiver<dxfeed::Event>,
     event_sender: flume::Sender<dxfeed::Event>,
 }
 
 unsafe impl Send for QuoteStreamer {}
+// unsafe impl Sync for QuoteStreamer {}
 
 impl QuoteStreamer {
-    pub fn connect<H: AsRef<str>, T: AsRef<str>>(host: H, token: T) -> Result<Self> {
+    pub async fn connect(tasty: &TastyTrade) -> Result<QuoteStreamer> {
+        let tokens = tasty.quote_streamer_tokens().await?;
         let (sender, receiver) = flume::unbounded();
 
-        let mut this = Self {
-            host: host.as_ref().to_owned(),
-            token: token.as_ref().to_owned(),
+        let this = Self {
+            host: tokens.streamer_url,
+            token: tokens.token,
 
-            connection: std::ptr::null_mut(),
-            subscription: std::ptr::null_mut(),
+            connection: Mutex::new(std::ptr::null_mut()),
+            subscription: Mutex::new(std::ptr::null_mut()),
 
             event_receiver: receiver,
             event_sender: sender,
@@ -60,7 +64,7 @@ impl QuoteStreamer {
                 None,                     // dxf_socket_thread_creation_notifier_t stcn,
                 None,                     // dxf_socket_thread_destruction_notifier_t stdn,
                 std::ptr::null_mut(),     // void* user_data,
-                &mut this.connection,     // OUT dxf_connection_t* connection);
+                &mut *this.connection.lock().unwrap(), // OUT dxf_connection_t* connection);
             )
         });
 
@@ -97,9 +101,11 @@ impl QuoteStreamer {
         }
     }
 
-    pub fn subscribe<S: AsSymbol>(&mut self, symbols: &[S]) {
+    pub fn subscribe<S: AsSymbol>(&self, symbols: &[S]) {
         let sender_ptr: *mut std::ffi::c_void =
-            &mut self.event_sender as *mut _ as *mut std::ffi::c_void;
+            &self.event_sender as *const flume::Sender<dxfeed::Event> as *mut std::ffi::c_void;
+        let mut sub = *self.subscription.lock().unwrap();
+        let conn = *self.connection.lock().unwrap();
 
         let symbols: Vec<WideCString> = symbols
             .iter()
@@ -114,41 +120,52 @@ impl QuoteStreamer {
         let c_syms: *mut dxfeed::dxf_const_string_t =
             symbol_pointers.as_mut_slice().as_ptr() as *mut dxfeed::dxf_const_string_t;
 
+        if sub.is_null() {
+            assert_eq!(SUCCESS, unsafe {
+                dxfeed::dxf_create_subscription(conn, dxfeed::DXF_ET_QUOTE, &mut sub)
+            });
+        }
+
         assert_eq!(SUCCESS, unsafe {
-            dxfeed::dxf_create_subscription(
-                self.connection,
-                dxfeed::DXF_ET_QUOTE,
-                &mut self.subscription,
-            )
+            dxfeed::dxf_attach_event_listener(sub, Some(Self::evt_listener), sender_ptr)
         });
 
         assert_eq!(SUCCESS, unsafe {
-            dxfeed::dxf_attach_event_listener(
-                self.subscription,
-                Some(Self::evt_listener),
-                sender_ptr,
-            )
-        });
-
-        assert_eq!(SUCCESS, unsafe {
-            dxfeed::dxf_add_symbols(self.subscription, c_syms, symbols.len() as i32)
+            dxfeed::dxf_add_symbols(sub, c_syms, symbols.len() as i32)
         });
     }
 
-    pub async fn handle_events<F>(&mut self, f: F)
-    where
-        F: Fn(Event),
-    {
-        while let Ok(ev) = self.event_receiver.recv_async().await {
-            f(ev);
+    // pub async fn handle_events<F>(&self, f: F)
+    // where
+    //     F: Fn(Event),
+    // {
+    //     while let Ok(ev) = self.event_receiver.recv_async().await {
+    //         f(ev);
+    //     }
+    // }
+
+    pub async fn get_event(&self) -> std::result::Result<Event, flume::RecvError> {
+        self.event_receiver.recv_async().await
+    }
+}
+
+impl Drop for QuoteStreamer {
+    fn drop(&mut self) {
+        let mut sub = self.subscription.lock().unwrap();
+        let mut conn = self.connection.lock().unwrap();
+        if !sub.is_null() {
+            assert_eq!(SUCCESS, unsafe { dxfeed::dxf_close_subscription(*sub) });
+            *sub = std::ptr::null_mut();
+        }
+        if !conn.is_null() {
+            unsafe { dxfeed::dxf_close_connection(*conn) };
+            *conn = std::ptr::null_mut();
         }
     }
 }
 
 impl TastyTrade {
     pub async fn create_quote_streamer(&self) -> Result<QuoteStreamer> {
-        let tokens = self.quote_streamer_tokens().await?;
-        let streamer = QuoteStreamer::connect(tokens.streamer_url, tokens.token)?;
-        Ok(streamer)
+        QuoteStreamer::connect(self).await
     }
 }
