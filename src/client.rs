@@ -7,11 +7,11 @@ use serde::Serialize;
 
 use crate::api::base::Result;
 use crate::api::base::TastyApiResponse;
-use crate::api::base::TastyError;
+//use crate::api::base::TastyError;
 use crate::api::login::LoginCredentials;
 use crate::api::login::LoginResponse;
 
-use reqwest_inspect_json::InspectJson;
+//use reqwest_inspect_json::InspectJson;
 
 pub const BASE_URL: &str = "https://api.tastyworks.com";
 pub const BASE_DEMO_URL: &str = "https://api.cert.tastyworks.com";
