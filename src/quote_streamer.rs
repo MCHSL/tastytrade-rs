@@ -80,11 +80,11 @@ impl QuoteStreamer {
 
     extern "C" fn sub_listener(
         _connection: dxfeed::dxf_connection_t,
-        old_status: dxfeed::dxf_connection_status_t,
-        new_status: dxfeed::dxf_connection_status_t,
+        _old_status: dxfeed::dxf_connection_status_t,
+        _new_status: dxfeed::dxf_connection_status_t,
         _sender_ptr: *mut std::ffi::c_void,
     ) {
-        eprintln!("!!! sub !!! {} => {}", old_status, new_status);
+        //eprintln!("!!! sub !!! {} => {}", old_status, new_status);
     }
 
     pub extern "C" fn evt_listener(

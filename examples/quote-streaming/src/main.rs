@@ -12,11 +12,9 @@ async fn main() {
     let mut streamer = tasty.create_quote_streamer().await.unwrap();
     streamer.subscribe(&["SPX"]);
 
-    streamer
-        .handle_events(|ev| {
-            if let Quote(data) = ev.data {
-                println!("{}: {}/{}", ev.sym, data.bid_price, data.ask_price);
-            }
-        })
-        .await
+    while let Ok(ev) = streamer.get_event().await {
+        if let Quote(data) = ev.data {
+            println!("{}: {}/{}", ev.sym, data.bid_price, data.ask_price);
+        }
+    }
 }

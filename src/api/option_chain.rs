@@ -7,26 +7,43 @@ use serde_json::Value;
 
 use crate::TastyTrade;
 
-use super::{base::Items, order::Symbol};
+use super::{
+    base::Items,
+    order::{AsSymbol, Symbol},
+    quote_streaming::DxFeedSymbol,
+};
 
-pub async fn nested_option_chain_for(
-    tasty: &TastyTrade,
-    symbol: impl Into<Symbol>,
-) -> Result<NestedOptionChain> {
-    let mut resp: Items<NestedOptionChain> = tasty
-        .get(format!("/option-chains/{}/nested", symbol.into().0))
-        .await?;
-    Ok(resp.items.remove(0))
+impl TastyTrade {
+    pub async fn nested_option_chain_for(
+        &self,
+        symbol: impl Into<Symbol>,
+    ) -> Result<NestedOptionChain> {
+        let mut resp: Items<NestedOptionChain> = self
+            .get(format!("/option-chains/{}/nested", symbol.into().0))
+            .await?;
+        Ok(resp.items.remove(0))
+    }
+
+    pub async fn option_chain_for(&self, symbol: impl Into<Symbol>) -> Result<Vec<OptionChain>> {
+        let resp: Items<OptionChain> = self
+            .get(format!("/option-chains/{}", symbol.into().0))
+            .await?;
+        Ok(resp.items)
+    }
+
+    pub async fn get_option_info(&self, symbol: impl AsSymbol) -> Result<OptionInfo> {
+        self.get(format!(
+            "/instruments/equity-options/{}",
+            symbol.as_symbol().0
+        ))
+        .await
+    }
 }
 
-pub async fn option_chain_for(
-    tasty: &TastyTrade,
-    symbol: impl Into<Symbol>,
-) -> Result<Vec<OptionChain>> {
-    let resp: Items<OptionChain> = tasty
-        .get(format!("/option-chains/{}", symbol.into().0))
-        .await?;
-    Ok(resp.items)
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub struct OptionInfo {
+    pub streamer_symbol: DxFeedSymbol,
 }
 
 #[derive(Debug, Deserialize)]

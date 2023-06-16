@@ -9,8 +9,7 @@ use crate::{
     Result, TastyTrade,
 };
 
-use super::order::LiveOrderRecord;
-use super::position::Position;
+use super::{order::LiveOrderRecord, position::BriefPosition};
 
 static WEBSOCKET_DEMO_URL: &str = "wss://streamer.cert.tastyworks.com";
 static WEBSOCKET_URL: &str = "wss://streamer.tastyworks.com";
@@ -42,8 +41,8 @@ pub struct HandlerAction {
 #[serde(tag = "type", content = "data")]
 pub enum AccountMessage {
     Order(LiveOrderRecord),
-    AccountBalance(Balance),
-    CurrentPosition(Box<Position>),
+    AccountBalance(Box<Balance>),
+    CurrentPosition(Box<BriefPosition>),
     OrderChain,
     ExternalTransaction,
 }

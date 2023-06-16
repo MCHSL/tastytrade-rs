@@ -5,8 +5,8 @@ use crate::api::base::Result;
 use crate::client::TastyTrade;
 
 use super::base::Items;
-use super::order::{DryRunResult, LiveOrderRecord, Order, OrderId, OrderPlacedResult};
-use super::position::Position;
+use super::order::{DryRunResult, LiveOrderRecord, Order, OrderId, OrderPlacedResult, PriceEffect};
+use super::position::FullPosition;
 
 impl TastyTrade {
     pub async fn accounts(&self) -> Result<Vec<Account>> {
@@ -88,8 +88,8 @@ impl<'t> Account<'t> {
         Ok(resp)
     }
 
-    pub async fn positions(&self) -> Result<Vec<Position>> {
-        let resp: Items<Position> = self
+    pub async fn positions(&self) -> Result<Vec<FullPosition>> {
+        let resp: Items<FullPosition> = self
             .tasty
             .get(&format!(
                 "/accounts/{}/positions",
@@ -159,4 +159,57 @@ pub struct Balance {
     pub long_derivative_value: Decimal,
     #[serde(with = "rust_decimal::serde::arbitrary_precision")]
     pub short_derivative_value: Decimal,
+    #[serde(with = "rust_decimal::serde::arbitrary_precision")]
+    pub long_futures_value: Decimal,
+    #[serde(with = "rust_decimal::serde::arbitrary_precision")]
+    pub short_futures_value: Decimal,
+    #[serde(with = "rust_decimal::serde::arbitrary_precision")]
+    pub long_futures_derivative_value: Decimal,
+    #[serde(with = "rust_decimal::serde::arbitrary_precision")]
+    pub short_futures_derivative_value: Decimal,
+    #[serde(with = "rust_decimal::serde::arbitrary_precision")]
+    pub long_margineable_value: Decimal,
+    #[serde(with = "rust_decimal::serde::arbitrary_precision")]
+    pub short_margineable_value: Decimal,
+    #[serde(with = "rust_decimal::serde::arbitrary_precision")]
+    pub margin_equity: Decimal,
+    #[serde(with = "rust_decimal::serde::arbitrary_precision")]
+    pub equity_buying_power: Decimal,
+    #[serde(with = "rust_decimal::serde::arbitrary_precision")]
+    pub derivative_buying_power: Decimal,
+    #[serde(with = "rust_decimal::serde::arbitrary_precision")]
+    pub day_trading_buying_power: Decimal,
+    #[serde(with = "rust_decimal::serde::arbitrary_precision")]
+    pub futures_margin_requirement: Decimal,
+    #[serde(with = "rust_decimal::serde::arbitrary_precision")]
+    pub available_trading_funds: Decimal,
+    #[serde(with = "rust_decimal::serde::arbitrary_precision")]
+    pub maintenance_requirement: Decimal,
+    #[serde(with = "rust_decimal::serde::arbitrary_precision")]
+    pub maintenance_call_value: Decimal,
+    #[serde(with = "rust_decimal::serde::arbitrary_precision")]
+    pub reg_t_call_value: Decimal,
+    #[serde(with = "rust_decimal::serde::arbitrary_precision")]
+    pub day_trading_call_value: Decimal,
+    #[serde(with = "rust_decimal::serde::arbitrary_precision")]
+    pub day_equity_call_value: Decimal,
+    #[serde(with = "rust_decimal::serde::arbitrary_precision")]
+    pub net_liquidating_value: Decimal,
+    #[serde(with = "rust_decimal::serde::arbitrary_precision")]
+    pub cash_available_to_withdraw: Decimal,
+    #[serde(with = "rust_decimal::serde::arbitrary_precision")]
+    pub day_trade_excess: Decimal,
+    #[serde(with = "rust_decimal::serde::arbitrary_precision")]
+    pub pending_cash: Decimal,
+    pub pending_cash_effect: PriceEffect,
+    #[serde(with = "rust_decimal::serde::arbitrary_precision")]
+    pub pending_margin_interest: Decimal,
+    #[serde(with = "rust_decimal::serde::arbitrary_precision")]
+    pub apex_starting_day_margin_equity: Decimal,
+    #[serde(with = "rust_decimal::serde::arbitrary_precision")]
+    pub buying_power_adjustment: Decimal,
+    pub buying_power_adjustment_effect: PriceEffect,
+    #[serde(with = "rust_decimal::serde::arbitrary_precision")]
+    pub effective_cryptocurrency_buying_power: Decimal,
+    pub updated_at: String,
 }

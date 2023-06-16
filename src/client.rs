@@ -16,7 +16,7 @@ use crate::api::login::LoginResponse;
 pub const BASE_URL: &str = "https://api.tastyworks.com";
 pub const BASE_DEMO_URL: &str = "https://api.cert.tastyworks.com";
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct TastyTrade {
     pub(crate) client: reqwest::Client,
     pub(crate) session_token: String,
