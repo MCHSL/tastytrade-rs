@@ -75,7 +75,7 @@ impl QuoteStreamer {
         _connection: dxfeed::dxf_connection_t,
         _user_data: *mut ::std::os::raw::c_void,
     ) {
-        eprintln!("!!! conn terminated !!!");
+        //eprintln!("!!! conn terminated !!!");
     }
 
     extern "C" fn sub_listener(
@@ -122,7 +122,11 @@ impl QuoteStreamer {
 
         if sub.is_null() {
             assert_eq!(SUCCESS, unsafe {
-                dxfeed::dxf_create_subscription(conn, dxfeed::DXF_ET_QUOTE, &mut sub)
+                dxfeed::dxf_create_subscription(
+                    conn,
+                    dxfeed::DXF_ET_QUOTE | dxfeed::DXF_ET_GREEKS,
+                    &mut sub,
+                )
             });
         }
 

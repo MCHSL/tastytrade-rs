@@ -5,7 +5,11 @@ use dxfeed::EventData::Quote;
 
 #[tokio::main]
 async fn main() {
-    let tasty = TastyTrade::login("username", "password", false)
+    let args = std::env::args().skip(1);
+    let username = args.next().unwrap();
+    let password = args.next().unwrap();
+
+    let tasty = TastyTrade::login(&username, &password, false)
         .await
         .unwrap();
 
