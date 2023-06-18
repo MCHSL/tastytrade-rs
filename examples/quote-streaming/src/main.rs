@@ -5,7 +5,7 @@ use dxfeed::EventData::Quote;
 
 #[tokio::main]
 async fn main() {
-    let args = std::env::args().skip(1);
+    let mut args = std::env::args().skip(1);
     let username = args.next().unwrap();
     let password = args.next().unwrap();
 
@@ -13,7 +13,7 @@ async fn main() {
         .await
         .unwrap();
 
-    let mut streamer = tasty.create_quote_streamer().await.unwrap();
+    let streamer = tasty.create_quote_streamer().await.unwrap();
     streamer.subscribe(&["SPX"]);
 
     while let Ok(ev) = streamer.get_event().await {
