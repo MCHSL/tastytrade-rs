@@ -1,9 +1,7 @@
 use std::collections::HashMap;
-use std::mem::ManuallyDrop;
-use std::sync::Mutex;
 use std::{ffi::CString, fmt::Display};
 
-use dxfeed::{dxf_event_flags_t, Event};
+use dxfeed::Event;
 use widestring::WideCString;
 
 use crate::api::order::AsSymbol;
@@ -26,6 +24,13 @@ impl Display for DxFeedError {
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
 pub struct SubscriptionId(usize);
 
+/// Represents a subscription to a data feed for specified symbols and event types.
+///
+/// # Note on symbology:
+///
+/// The tastytrade API uses the OCC symbol format for options, e.g. "SPXW  230623P04295000"
+/// DxFeed uses varying symbols depending on the data provider. To convert
+/// tastytrade symbols to DxFeed ones, use [`crate::TastyTrade::get_streamer_symbol`]
 #[derive(Debug)]
 pub struct QuoteSubscription {
     pub id: SubscriptionId,
@@ -44,11 +49,13 @@ impl Drop for QuoteSubscription {
             unsafe {
                 std::mem::drop(Box::from_raw(self.sender_ptr));
             }
+            self.sender_ptr = std::ptr::null_mut();
         }
     }
 }
 
 impl QuoteSubscription {
+    /// Add symbols to subscription. See the "Note on symbology" section in [`QuoteSubscription`]
     pub fn add_symbols<S: AsSymbol>(&self, symbols: &[S]) {
         let symbols: Vec<WideCString> = symbols
             .iter()
@@ -68,11 +75,12 @@ impl QuoteSubscription {
         });
     }
 
+    /// Receive one event from DxFeed. Yields if there are no events.
     pub async fn get_event(&self) -> std::result::Result<Event, flume::RecvError> {
         self.event_receiver.recv_async().await
     }
 
-    pub extern "C" fn sub_callback(
+    extern "C" fn sub_callback(
         event_type: std::os::raw::c_int,
         sym: dxfeed::dxf_const_string_t,
         data: *const dxfeed::dxf_event_data_t,
@@ -87,6 +95,7 @@ impl QuoteSubscription {
     }
 }
 
+/// Represents a connection to DxFeed through which subscriptions can be created.
 #[derive(Debug)]
 pub struct QuoteStreamer {
     host: String,
@@ -148,6 +157,7 @@ impl QuoteStreamer {
         //eprintln!("!!! sub !!! {} => {}", old_status, new_status);
     }
 
+    /// Create a subscription to market data. See `dxfeed::DXF_ET_*` for possible event types.
     pub fn create_sub(&mut self, flags: i32) -> &QuoteSubscription {
         let mut subscription: dxfeed::dxf_subscription_t = std::ptr::null_mut();
         let (event_sender, event_receiver) = flume::unbounded();
@@ -180,70 +190,20 @@ impl QuoteStreamer {
         self.get_sub(id).unwrap()
     }
 
+    /// Retrieve a subscription by id.
     pub fn get_sub(&self, id: SubscriptionId) -> Option<&QuoteSubscription> {
         self.subscriptions.get(&id)
     }
 
-    // pub fn subscribe<S: AsSymbol>(&self, symbols: &[S]) {
-    //     // let sender_ptr: *mut std::ffi::c_void =
-    //     //     &self.event_sender as *const flume::Sender<dxfeed::Event> as *mut std::ffi::c_void;
-    //     // let mut sub = *self.subscription.lock().unwrap();
-    //     let conn = *self.connection.lock().unwrap();
-
-    //     let symbols: Vec<WideCString> = symbols
-    //         .iter()
-    //         .map(|sym| WideCString::from_str(sym.as_symbol().0).unwrap())
-    //         .collect();
-
-    //     let mut symbol_pointers: Vec<*const i32> = symbols
-    //         .iter()
-    //         .map(|sym| sym.as_ptr() as *const i32)
-    //         .collect();
-
-    //     let c_syms: *mut dxfeed::dxf_const_string_t =
-    //         symbol_pointers.as_mut_slice().as_ptr() as *mut dxfeed::dxf_const_string_t;
-
-    //     if sub.is_null() {
-    //         assert_eq!(SUCCESS, unsafe {
-    //             dxfeed::dxf_create_subscription(
-    //                 conn,
-    //                 dxfeed::DXF_ET_QUOTE | dxfeed::DXF_ET_GREEKS,
-    //                 &mut sub,
-    //             )
-    //         });
-    //     }
-
-    //     assert_eq!(SUCCESS, unsafe {
-    //         dxfeed::dxf_attach_event_listener(sub, Some(Self::evt_listener), sender_ptr)
-    //     });
-
-    //     assert_eq!(SUCCESS, unsafe {
-    //         dxfeed::dxf_add_symbols(sub, c_syms, symbols.len() as i32)
-    //     });
-    // }
-
-    // pub async fn handle_events<F>(&self, f: F)
-    // where
-    //     F: Fn(Event),
-    // {
-    //     while let Ok(ev) = self.event_receiver.recv_async().await {
-    //         f(ev);
-    //     }
-    // }
-
-    // pub async fn get_event(&self) -> std::result::Result<Event, flume::RecvError> {
-    //     self.event_receiver.recv_async().await
-    // }
+    /// Close and remove subscription by id.
+    pub fn close_sub(&mut self, id: SubscriptionId) {
+        self.subscriptions.remove(&id);
+    }
 }
 
 impl Drop for QuoteStreamer {
     fn drop(&mut self) {
-        // let mut sub = self.subscription.lock().unwrap();
         self.subscriptions.clear();
-        // if !sub.is_null() {
-        //     assert_eq!(SUCCESS, unsafe { dxfeed::dxf_close_subscription(*sub) });
-        //     *sub = std::ptr::null_mut();
-        // }
         if !self.connection.is_null() {
             unsafe { dxfeed::dxf_close_connection(self.connection) };
             self.connection = std::ptr::null_mut();
@@ -252,6 +212,7 @@ impl Drop for QuoteStreamer {
 }
 
 impl TastyTrade {
+    /// Creates a connection to DxFeed for market data.
     pub async fn create_quote_streamer(&self) -> Result<QuoteStreamer> {
         QuoteStreamer::connect(self).await
     }

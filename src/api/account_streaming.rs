@@ -132,7 +132,10 @@ impl AccountStreamer {
 
                 let message = Message::Text(message);
 
-                write.send(message).await.unwrap();
+                if write.send(message).await.is_err() {
+                    // TODO: send message informing user of disconnection
+                    break;
+                }
             }
         });
 
@@ -140,13 +143,16 @@ impl AccountStreamer {
         tokio::spawn(async move {
             loop {
                 tokio::time::sleep(Duration::from_secs(30)).await;
-                sender_clone
+                if sender_clone
                     .send_async(HandlerAction {
                         action: SubRequestAction::Heartbeat,
                         value: None,
                     })
                     .await
-                    .unwrap();
+                    .is_err()
+                {
+                    break;
+                }
             }
         });
 
@@ -179,16 +185,7 @@ impl AccountStreamer {
             .unwrap();
     }
 
-    pub async fn close(&self) {}
-
-    // pub async fn handle_events<F>(&mut self, f: F)
-    // where
-    //     F: Fn(AccountEvent),
-    // {
-    //     while let Ok(ev) = self.event_receiver.recv_async().await {
-    //         f(ev);
-    //     }
-    // }
+    // pub async fn close(&self) {}
 
     pub async fn get_event(&self) -> std::result::Result<AccountEvent, flume::RecvError> {
         self.event_receiver.recv_async().await
