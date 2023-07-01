@@ -1,6 +1,6 @@
 # tastytrade-rs
 
-Rust library for stock market trading through tastytrade's API. Very much work in progress.
+Rust library for stock market trading through tastytrade's API. Very much work in progress. See [https://github.com/MCHSL/tastytrade-cli](tastytrade-cli) for an example of a more involved application using this library.
 
 # Example
 
