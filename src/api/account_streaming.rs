@@ -112,7 +112,7 @@ impl AccountStreamer {
         tokio::spawn(async move {
             while let Some(message) = read.next().await {
                 let data = message.unwrap().into_data();
-                println!("{:?}", String::from_utf8_lossy(&data));
+                //println!("{:?}", String::from_utf8_lossy(&data));
                 let data: AccountEvent = serde_json::from_slice(&data).unwrap();
                 event_sender.send_async(data).await.unwrap();
             }

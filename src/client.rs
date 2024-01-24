@@ -2,11 +2,18 @@ use reqwest::header;
 use reqwest::header::HeaderMap;
 use reqwest::header::HeaderValue;
 use reqwest::ClientBuilder;
+
 use serde::de::DeserializeOwned;
+
 use serde::Serialize;
 
+use crate::api::base::Items;
+use crate::api::base::Paginated;
+
+use crate::api::base::Response;
 use crate::api::base::Result;
 use crate::api::base::TastyApiResponse;
+
 //use crate::api::base::TastyError;
 use crate::api::login::LoginCredentials;
 use crate::api::login::LoginResponse;
@@ -22,6 +29,25 @@ pub struct TastyTrade {
     pub(crate) session_token: String,
     base_url: &'static str,
     pub(crate) demo: bool,
+}
+
+pub trait FromTastyResponse<T: DeserializeOwned> {
+    fn from_tasty(resp: Response<T>) -> Self;
+}
+
+impl<T: DeserializeOwned> FromTastyResponse<T> for T {
+    fn from_tasty(resp: Response<T>) -> Self {
+        resp.data
+    }
+}
+
+impl<T: DeserializeOwned> FromTastyResponse<Items<T>> for Paginated<T> {
+    fn from_tasty(resp: Response<Items<T>>) -> Self {
+        Paginated {
+            items: resp.data.items,
+            pagination: resp.pagination.unwrap(),
+        }
+    }
 }
 
 impl TastyTrade {
@@ -103,24 +129,35 @@ impl TastyTrade {
         Ok(response)
     }
 
-    pub async fn get<T: DeserializeOwned, U: AsRef<str>>(&self, url: U) -> Result<T> {
+    pub async fn get_with_query<T, R, U>(&self, url: U, query: &[(&str, &str)]) -> Result<R>
+    where
+        T: DeserializeOwned,
+        R: FromTastyResponse<T>,
+        U: AsRef<str>,
+    {
         let url = format!("{}{}", self.base_url, url.as_ref());
 
         let result = self
             .client
             .get(url)
+            .query(query)
             .send()
             .await?
             // .inspect_json::<TastyApiResponse<T>, TastyError>(move |text| {
+            //     println!("{:?}", std::any::type_name::<T>());
             //     println!("{text}");
             // })
             .json::<TastyApiResponse<T>>()
             .await?;
 
         match result {
-            TastyApiResponse::Success(s) => Ok(s.data),
+            TastyApiResponse::Success(s) => Ok(R::from_tasty(s)),
             TastyApiResponse::Error { error } => Err(error.into()),
         }
+    }
+
+    pub async fn get<T: DeserializeOwned, U: AsRef<str>>(&self, url: U) -> Result<T> {
+        self.get_with_query(url, &[]).await
     }
 
     pub async fn post<R, P, U>(&self, url: U, payload: P) -> Result<R>

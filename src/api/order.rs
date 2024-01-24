@@ -8,6 +8,7 @@ use crate::accounts::AccountNumber;
 pub enum PriceEffect {
     Debit,
     Credit,
+    None,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
